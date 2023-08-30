@@ -1,0 +1,27 @@
+#include <Arduino.h>
+#include <FastLED.h>
+
+#define LED_PIN 2
+#define LED_COUNT 8
+
+CRGB leds[LED_COUNT];
+
+void setup() {
+  // put your setup code here, to run once:
+  FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, LED_COUNT);
+}
+
+void loop() {
+  // Alle LEDs auf rot setzen
+fill_solid(leds, LED_COUNT, CRGB::Red);
+FastLED.show();
+delay(500);
+// Alle LEDs auf grün setzen
+fill_solid(leds, LED_COUNT, CRGB::Green);
+FastLED.show();
+delay(500);
+// Alle LEDs auf blau setzen
+fill_solid(leds, LED_COUNT, CRGB::Blue);
+FastLED.show();
+delay(500);
+}
