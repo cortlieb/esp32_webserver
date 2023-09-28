@@ -57,8 +57,8 @@ margin:0px auto;
 </style>
 </head>
 <body>
-<h1>Hello World!</h1>
-<p>Congratulations!<br>This is your first Web Server with the ESP.</p>
+<h1>Hallo Melanie!</h1>
+<p>Guck dir das an!<br>Kommt von meinem Kleincomputer, der sonst Lichter kreisen lässt!</p>
 </body>
 </html>
 )rawliteral";
@@ -84,16 +84,13 @@ Adafruit_NeoPixel ringKlein(LED_RING_KL_COUNT, LED_RING_KL_PIN, NEO_GRB + NEO_KH
 
 void initWiFi();
 void drawCycleText(const char *test_char);
+void drawChar(const char character);
+void drawIPAdr(IPAddress ipAdr);
 void runningCircleSingle(uint32_t color, uint32_t backgroundColor, int wait);
 
 void setup()
 {
 	Serial.begin(115200);
-	initWiFi();
-	server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
-			  { request->send(200, "text/html", index_html); });
-	// Start server
-	server.begin();
 
 	// SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
 	if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS))
@@ -105,22 +102,22 @@ void setup()
 
 	// Clear the buffer
 	display.clearDisplay();
+	display.display();
 
 	ringKlein.begin();
 	ringKlein.show();
-	ringKlein.setBrightness(64);
+	ringKlein.setBrightness(8);
+
+	initWiFi();
+	server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
+			  { request->send(200, "text/html", index_html); });
+	// Start server
+	server.begin();
 }
 
 void loop()
 {
-	drawCycleText("   Rot    ");
-	runningCircleSingle(RED, BLACK, DELAY);
-	drawCycleText("  Gruen   ");
-	runningCircleSingle(GREEN, BLACK, DELAY);
-	drawCycleText("   Blau   ");
-	runningCircleSingle(BLUE, BLACK, DELAY);
-	drawCycleText("  Weiss   ");
-	runningCircleSingle(WHITE, BLACK, DELAY);
+	;
 }
 
 void testdrawchar(void)
@@ -158,6 +155,26 @@ void drawCycleText(const char *text)
 	display.display();
 }
 
+void drawChar(const char character)
+{
+	// display.clearDisplay();
+	display.setTextColor(SSD1306_WHITE); // Draw white text
+	display.setTextSize(2);
+	// display.setCursor(2, 0);
+	display.write(character);
+	display.display();
+}
+
+void drawIPAdr(IPAddress ipAdr)
+{
+	display.setTextColor(SSD1306_WHITE); // Draw white text
+	display.setTextSize(1);
+	display.setCursor(0, 0);
+	display.print(F("IP: "));
+	display.println(ipAdr);
+	display.display();
+}
+
 void runningCircleSingle(uint32_t color, uint32_t backgroundColor, int wait)
 {
 	for (int i = 0; i < LED_RING_KL_COUNT; i++)
@@ -169,15 +186,26 @@ void runningCircleSingle(uint32_t color, uint32_t backgroundColor, int wait)
 	}
 }
 
+void setCircleLED(int noLED, uint32_t color)
+{
+	ringKlein.setPixelColor(noLED, color);
+	ringKlein.show();
+}
+
 void initWiFi()
 {
+	setCircleLED(4, RED);
 	WiFi.mode(WIFI_STA);
 	WiFi.begin(ssid, password);
 	Serial.print("Connecting to WiFi ..");
 	while (WiFi.status() != WL_CONNECTED)
 	{
 		Serial.print('.');
+		drawChar('.');
+
 		delay(1000);
 	}
+	setCircleLED(4, GREEN);
 	Serial.println(WiFi.localIP());
+	drawIPAdr(WiFi.localIP());
 }
