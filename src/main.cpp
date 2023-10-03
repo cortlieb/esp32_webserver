@@ -30,6 +30,7 @@
 #include <WiFi.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
+#include "SPIFFS.h"
 
 // Replace with your network credentials
 const char *ssid = "Villanetz";
@@ -37,31 +38,6 @@ const char *password = "Kellerbad100%";
 
 // Create AsyncWebServer object on port 80
 AsyncWebServer server(80);
-
-const char index_html[] PROGMEM = R"rawliteral(
-<!DOCTYPE html>
-<html>
-<head>
-<title>ESP Web Server</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" href="data:,">
-<style>
-html {
-font-family: Arial;
-text-align: center;
-}
-body {
-max-width: 400px;
-margin:0px auto;
-}
-</style>
-</head>
-<body>
-<h1>Hallo Melanie!</h1>
-<p>Guck dir das an!<br>Kommt von meinem Kleincomputer, der sonst Lichter kreisen lässt!</p>
-</body>
-</html>
-)rawliteral";
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -83,6 +59,7 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 Adafruit_NeoPixel ringKlein(LED_RING_KL_COUNT, LED_RING_KL_PIN, NEO_GRB + NEO_KHZ800);
 
 void initWiFi();
+void initSPIFFS();
 void drawCycleText(const char *test_char);
 void drawChar(const char character);
 void drawIPAdr(IPAddress ipAdr);
@@ -109,8 +86,11 @@ void setup()
 	ringKlein.setBrightness(8);
 
 	initWiFi();
+	initSPIFFS();
+
 	server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
-			  { request->send(200, "text/html", index_html); });
+			  { request->send(SPIFFS, "/index.html", "text/html"); });
+	server.serveStatic("/", SPIFFS, "/");
 	// Start server
 	server.begin();
 }
@@ -208,4 +188,16 @@ void initWiFi()
 	setCircleLED(4, GREEN);
 	Serial.println(WiFi.localIP());
 	drawIPAdr(WiFi.localIP());
+}
+
+void initSPIFFS()
+{
+	if (!SPIFFS.begin(true))
+	{
+		Serial.println("An error has occurred while mounting SPIFFS");
+	}
+	else
+	{
+		Serial.println("SPIFFS mounted successfully");
+	}
 }
