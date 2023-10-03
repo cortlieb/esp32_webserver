@@ -39,6 +39,12 @@ const char *password = "Kellerbad100%";
 // Create AsyncWebServer object on port 80
 AsyncWebServer server(80);
 
+// Set LED GPIO
+const int ledPin = 2;
+
+// Stores LED state
+String ledState;
+
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
@@ -64,6 +70,16 @@ void drawCycleText(const char *test_char);
 void drawChar(const char character);
 void drawIPAdr(IPAddress ipAdr);
 void runningCircleSingle(uint32_t color, uint32_t backgroundColor, int wait);
+void indicatorLight(bool state);
+
+String processor(const String &var)
+{
+	if (var == "STATE")
+	{
+		return ledState;
+	}
+	return String();
+}
 
 void setup()
 {
@@ -91,6 +107,18 @@ void setup()
 	server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
 			  { request->send(SPIFFS, "/index.html", "text/html"); });
 	server.serveStatic("/", SPIFFS, "/");
+
+	// Route to switch indicator light ON
+	server.on("/on", HTTP_GET, [](AsyncWebServerRequest *request)
+			  {
+			indicatorLight(true);
+			request->send(SPIFFS, "/index.html", "text/html", false, processor); });
+	// Route to switch indicator light OFF
+	server.on("/off", HTTP_GET, [](AsyncWebServerRequest *request)
+			  {
+				indicatorLight(false);
+				request->send(SPIFFS, "/index.html", "text/html", false, processor); });
+
 	// Start server
 	server.begin();
 }
@@ -199,5 +227,23 @@ void initSPIFFS()
 	else
 	{
 		Serial.println("SPIFFS mounted successfully");
+	}
+}
+
+void indicatorLight(bool state)
+{
+	if (state)
+	{
+		setCircleLED(1, BLUE);
+		setCircleLED(2, BLUE);
+		setCircleLED(3, BLUE);
+		ledState = "ON";
+	}
+	else
+	{
+		setCircleLED(1, BLACK);
+		setCircleLED(2, BLACK);
+		setCircleLED(3, BLACK);
+		ledState = "OFF";
 	}
 }
