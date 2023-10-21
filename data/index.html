@@ -13,20 +13,45 @@
 
 <body>
 	<div class="topnav">
-		<h1>Ortliebweb ESP Webserver</h1>
+		<h1>Ortliebweb ESP Webserver - Control multiple Outputs</h1>
 	</div>
 	<div class="content">
 		<div class="card-grid">
 			<div class="card">
-				<p class="card-title"><i class="fas fa-lightbulb"></i> GPIO 2</p>
-				<p>
-					<a href="on"><button class="button-on">ON</button></a>
-					<a href="off"><button class="button-off">OFF</button></a>
-				</p>
-				<p class="state">Status: %STATE%</p>
+				<p class="card-title"> <i class="fas fa-lightbulb"></i>Ind 1 blue</p>
+				<label class="switch">
+					<input type="checkbox" onchange="toggleCheckbox(this)" id="1b">
+					<span class="slider"></span>
+				</label>
+				<p class="state"><span id="1_blue_state"></span></p>
+			</div>
+			<div class="card">
+				<p class="card-title"> <i class="fas fa-lightbulb"></i> Ind 1 red</p>
+				<label class="switch">
+					<input type="checkbox" onchange="toggleCheckbox(this)" id="1r">
+					<span class="slider"></span>
+				</label>
+				<p class="state"><span id="1_red_state"></span></p>
+			</div>
+			<div class="card">
+				<p class="card-title"> <i class="fas fa-lightbulb"></i> Ind 2 blue</p>
+				<label class="switch">
+					<input type="checkbox" onchange="toggleCheckbox(this)" id="2b">
+					<span class="slider"></span>
+				</label>
+				<p class="state"><span id="2_blue_state"></span></p>
+			</div>
+			<div class="card">
+				<p class="card-title"> <i class="fas fa-lightbulb"></i> Ind 2 red</p>
+				<label class="switch">
+					<input type="checkbox" onchange="toggleCheckbox(this)" id="2r">
+					<span class="slider"></span>
+				</label>
+				<p class="state"><span id="2_red_state"></span></p>
 			</div>
 		</div>
 	</div>
+	<script src="script.js"></script>
 </body>
 
 </html>
