@@ -21,16 +21,17 @@
 // using namespace std;
 
 // #include <Arduino.h> //lt. Webserver Ebook nötig, war aber vorher nicht da und lief bis dahin trotzdem - beobachten!
+#include "../include/colors.h"
 #include <SPI.h>
 #include <Adafruit_NeoPixel.h>
-#include "../include/colors.h"
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <WiFi.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
-#include "SPIFFS.h"
+#include <SPIFFS.h>
+#include <Arduino_JSON.h>
 
 // Replace with your network credentials
 const char *ssid = "Villanetz";
@@ -39,8 +40,12 @@ const char *password = "Kellerbad100%";
 // Create AsyncWebServer object on port 80
 AsyncWebServer server(80);
 
-// Set LED GPIO
-const int ledPin = 2;
+const char *PARAM_INPUT_OUTPUT = "output";
+const char *PARAM_INPUT_STATE = "state";
+
+#define NUM_OUTPUTS 4
+
+int outputIDs[NUM_OUTPUTS] = {1, 2, 3, 4};
 
 // Stores LED state
 String ledState;
@@ -79,6 +84,11 @@ String processor(const String &var)
 		return ledState;
 	}
 	return String();
+}
+
+String getOutputStates()
+{
+	JSONVar outputStates;
 }
 
 void setup()
