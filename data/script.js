@@ -16,19 +16,21 @@ function toggleCheckbox(element) {
 function getStates() {
 	var xhr = new XMLHttpRequest(); //TODO: Deklaration austauschen mit let
 	xhr.onreadystatechange = function () {
-		var stateObj = JSON.parse(this.responseText);
-		console.log(stateObj);
-		for (i in stateObj.outputs) {
-			var output = stateObj[i].output;
-			var state = stateObj[i].state;
-			console.log(output);
-			console.log(state);
-			if (state == "1") {
-				document.getElementById(output).checked = true;
-				document.getElementById(output + "_state").innerHTML = "ON";
-			} else {
-				document.getElementById(output).checked = false;
-				document.getElementById(output + "_state").innerHTML = "OFF";
+		if (this.readyState == 4 && this.status == 200) {
+			var stateObj = JSON.parse(this.responseText);
+			console.log(stateObj);
+			for (i in stateObj.outputs) {
+				var output = stateObj.outputs[i].output;
+				var state = stateObj.outputs[i].state;
+				console.log(output);
+				console.log(state);
+				if (state == "1") {
+					document.getElementById(output).checked = true;
+					document.getElementById(output + "_state").innerHTML = "ON";
+				} else {
+					document.getElementById(output).checked = false;
+					document.getElementById(output + "_state").innerHTML = "OFF";
+				}
 			}
 		}
 	}

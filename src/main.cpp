@@ -1,3 +1,4 @@
+// TODO: ganzen Code gut kommentieren, existierende (fremde) Kommentare entfernen
 /**************************************************************************
  This is an example for our Monochrome OLEDs based on SSD1306 drivers
 
@@ -46,9 +47,10 @@ const char *PARAM_INPUT_STATE = "state";
 #define NUM_OUTPUTS 4
 
 int outputIDs[NUM_OUTPUTS] = {1, 2, 3, 4};
+bool outputStates[NUM_OUTPUTS] = {false, false, false, false};
 
 // Stores LED state
-String ledState;
+// String ledState; //TODO: entfernen
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -75,20 +77,37 @@ void drawCycleText(const char *test_char);
 void drawChar(const char character);
 void drawIPAdr(IPAddress ipAdr);
 void runningCircleSingle(uint32_t color, uint32_t backgroundColor, int wait);
-void indicatorLight(bool state);
+void setOutput(int output, int state);
 
-String processor(const String &var)
-{
-	if (var == "STATE")
-	{
-		return ledState;
-	}
-	return String();
-}
+// String processor(const String &var) //TODO: entfernen
+// {
+// 	if (var == "STATE")
+// 	{
+// 		return ledState;
+// 	}
+// 	return String();
+// }
 
 String getOutputStates()
 {
-	JSONVar outputStates;
+	JSONVar outputStatesJSON;
+	for (int i = 0; i < NUM_OUTPUTS; i++)
+	{
+		outputStatesJSON["outputs"][i]["output"] = String(outputIDs[i]);
+		// outputStates["outputs"][i]["state"] = (outputStates[i]) ? "1" : "0";
+		Serial.print(outputStates[i]);
+		if (outputStates[i])
+		{
+			outputStatesJSON["outputs"][i]["state"] = "1";
+		}
+		else
+		{
+			outputStatesJSON["outputs"][i]["state"] = "0";
+		}
+	}
+	String jsonString = JSON.stringify(outputStatesJSON);
+	Serial.print(jsonString);
+	return jsonString;
 }
 
 void setup()
@@ -118,16 +137,30 @@ void setup()
 			  { request->send(SPIFFS, "/index.html", "text/html"); });
 	server.serveStatic("/", SPIFFS, "/");
 
-	// Route to switch indicator light ON
-	server.on("/on", HTTP_GET, [](AsyncWebServerRequest *request)
+	server.on("/states", HTTP_GET, [](AsyncWebServerRequest *request)
 			  {
-			indicatorLight(true);
-			request->send(SPIFFS, "/index.html", "text/html", false, processor); });
-	// Route to switch indicator light OFF
-	server.on("/off", HTTP_GET, [](AsyncWebServerRequest *request)
+		String json = getOutputStates();
+		request->send(200, "application/json", json);
+		Serial.print(json);
+		json = String(); });
+
+	server.on("/update", HTTP_GET, [](AsyncWebServerRequest *request)
 			  {
-				indicatorLight(false);
-				request->send(SPIFFS, "/index.html", "text/html", false, processor); });
+		String output;
+		String state;
+		if (request->hasParam(PARAM_INPUT_OUTPUT) && request->hasParam(PARAM_INPUT_STATE)) {
+			output = request->getParam(PARAM_INPUT_OUTPUT)->value();
+			state = request->getParam(PARAM_INPUT_STATE)->value();
+			setOutput(output.toInt(), state.toInt());
+		} else {
+			output = "No message sent";
+			state = "No message sent";
+		} 
+		Serial.print("GPIO: ");
+		Serial.print(output);
+		Serial.print(" - Set to: ");
+		Serial.println(state);
+		request->send(200, "text/plain", "OK"); });
 
 	// Start server
 	server.begin();
@@ -240,20 +273,23 @@ void initSPIFFS()
 	}
 }
 
-void indicatorLight(bool state)
+void setOutput(int output, int state)
 {
+	int ledNr;
+
+	ledNr = output + 4;
+	if (ledNr > 7)
+	{
+		ledNr = 0;
+	}
 	if (state)
 	{
-		setCircleLED(1, BLUE);
-		setCircleLED(2, BLUE);
-		setCircleLED(3, BLUE);
-		ledState = "ON";
+		outputStates[output - 1] = true;
+		setCircleLED(ledNr, BLUE);
 	}
 	else
 	{
-		setCircleLED(1, BLACK);
-		setCircleLED(2, BLACK);
-		setCircleLED(3, BLACK);
-		ledState = "OFF";
+		outputStates[output - 1] = false;
+		setCircleLED(ledNr, BLACK);
 	}
 }
