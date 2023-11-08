@@ -1,25 +1,15 @@
-// TODO: ganzen Code gut kommentieren, existierende (fremde) Kommentare entfernen
 /**************************************************************************
- This is an example for our Monochrome OLEDs based on SSD1306 drivers
-
- Pick one up today in the adafruit shop!
- ------> http://www.adafruit.com/category/63_98
-
- This example is for a 128x64 pixel display using I2C to communicate
- 3 pins are required to interface (two I2C and one reset).
-
- Adafruit invests time and resources providing this open
- source code, please support Adafruit and open-source
- hardware by purchasing products from Adafruit!
-
- Written by Limor Fried/Ladyada for Adafruit Industries,
- with contributions from the open source community.
- BSD license, check license.txt for more information
- All text above, and the splash screen below must be
- included in any redistribution.
+ * ESP32 Webserver example
+ * Using:
+ *  - AZ-Delivery Devkit-v4 like board
+ *  - Monochrome OLEDs based on SSD1306 drivers (128x64, I2C)
+ *  - 8 LED ring (WS2812)
  **************************************************************************/
 // #include <string>
 // using namespace std;
+
+// Avoid conflicts between OLED library color definitions and own color definitions
+#define NO_ADAFRUIT_SSD1306_COLOR_COMPATIBILITY
 
 // #include <Arduino.h> //lt. Webserver Ebook nötig, war aber vorher nicht da und lief bis dahin trotzdem - beobachten!
 #include "../include/colors.h"
@@ -34,7 +24,7 @@
 #include <SPIFFS.h>
 #include <Arduino_JSON.h>
 
-// Replace with your network credentials
+// WIFI network credentials
 const char *ssid = "Villanetz";
 const char *password = "Kellerbad100%";
 
@@ -46,11 +36,7 @@ const char *PARAM_INPUT_STATE = "state";
 
 #define NUM_OUTPUTS 4
 
-int outputIDs[NUM_OUTPUTS] = {1, 2, 3, 4};
 bool outputStates[NUM_OUTPUTS] = {false, false, false, false};
-
-// Stores LED state
-// String ledState; //TODO: entfernen
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -62,13 +48,12 @@ bool outputStates[NUM_OUTPUTS] = {false, false, false, false};
 
 // Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
 // The pins for I2C are defined by the Wire-library.
-// On an arduino UNO:       A4(SDA), A5(SCL)
-// On an arduino MEGA 2560: 20(SDA), 21(SCL)
-// On an arduino LEONARDO:   2(SDA),  3(SCL), ...
 #define OLED_RESET -1		// Reset pin # (or -1 if sharing Arduino reset pin)
-#define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
+#define SCREEN_ADDRESS 0x3C // original comment: See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
+							// in fac 0x3C works
+// create object for the display
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
-
+// create object for the LED-ring
 Adafruit_NeoPixel ringKlein(LED_RING_KL_COUNT, LED_RING_KL_PIN, NEO_GRB + NEO_KHZ800);
 
 void initWiFi();
@@ -79,34 +64,21 @@ void drawIPAdr(IPAddress ipAdr);
 void runningCircleSingle(uint32_t color, uint32_t backgroundColor, int wait);
 void setOutput(int output, int state);
 
-// String processor(const String &var) //TODO: entfernen
-// {
-// 	if (var == "STATE")
-// 	{
-// 		return ledState;
-// 	}
-// 	return String();
-// }
+/*
+ Retrieves the stae of the used outputs.
 
+ @return json-formatted status of outputs
+*/
 String getOutputStates()
 {
 	JSONVar outputStatesJSON;
 	for (int i = 0; i < NUM_OUTPUTS; i++)
 	{
-		outputStatesJSON["outputs"][i]["output"] = String(outputIDs[i]);
-		// outputStates["outputs"][i]["state"] = (outputStates[i]) ? "1" : "0";
+		outputStatesJSON["outputs"][i]["output"] = String(i + 1);
+		outputStatesJSON["outputs"][i]["state"] = (outputStates[i]) ? "1" : "0";
 		Serial.print(outputStates[i]);
-		if (outputStates[i])
-		{
-			outputStatesJSON["outputs"][i]["state"] = "1";
-		}
-		else
-		{
-			outputStatesJSON["outputs"][i]["state"] = "0";
-		}
 	}
 	String jsonString = JSON.stringify(outputStatesJSON);
-	Serial.print(jsonString);
 	return jsonString;
 }
 
@@ -133,24 +105,30 @@ void setup()
 	initWiFi();
 	initSPIFFS();
 
+	// when server is requested on root adress the main html file is delivered
 	server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
 			  { request->send(SPIFFS, "/index.html", "text/html"); });
+	// serve requested files from root adress from file system root
 	server.serveStatic("/", SPIFFS, "/");
 
+	// when server is requested on "/states" adress json-formatted states of outputs are delivered
 	server.on("/states", HTTP_GET, [](AsyncWebServerRequest *request)
 			  {
 		String json = getOutputStates();
 		request->send(200, "application/json", json);
-		Serial.print(json);
 		json = String(); });
 
+	// when server is requested on "/update" outputs are set according to request parameters
 	server.on("/update", HTTP_GET, [](AsyncWebServerRequest *request)
 			  {
 		String output;
 		String state;
+
+		//if request has correct format
 		if (request->hasParam(PARAM_INPUT_OUTPUT) && request->hasParam(PARAM_INPUT_STATE)) {
 			output = request->getParam(PARAM_INPUT_OUTPUT)->value();
 			state = request->getParam(PARAM_INPUT_STATE)->value();
+			//set outputs according to transmitted parameters
 			setOutput(output.toInt(), state.toInt());
 		} else {
 			output = "No message sent";
@@ -169,29 +147,6 @@ void setup()
 void loop()
 {
 	;
-}
-
-void testdrawchar(void)
-{
-	display.clearDisplay();
-
-	display.setTextSize(1);				 // Normal 1:1 pixel scale
-	display.setTextColor(SSD1306_WHITE); // Draw white text
-	display.setCursor(0, 0);			 // Start at top-left corner
-	display.cp437(true);				 // Use full 256 char 'Code Page 437' font
-
-	// Not all the characters will fit on the display. This is normal.
-	// Library will draw what it can and the rest will be clipped.
-	for (int16_t i = 0; i < 256; i++)
-	{
-		if (i == '\n')
-			display.write(' ');
-		else
-			display.write(i);
-	}
-
-	display.display();
-	delay(2000);
 }
 
 void drawCycleText(const char *text)
@@ -216,6 +171,11 @@ void drawChar(const char character)
 	display.display();
 }
 
+/*
+ Print IP adress on connected OLED display
+
+ @param ipAdr IP adress to print
+*/
 void drawIPAdr(IPAddress ipAdr)
 {
 	display.setTextColor(SSD1306_WHITE); // Draw white text
@@ -237,18 +197,30 @@ void runningCircleSingle(uint32_t color, uint32_t backgroundColor, int wait)
 	}
 }
 
+/*
+ Set one LED in the LED ring to the given color
+
+ @param noLED ID of LED (0 ... 7)
+ @param color LED color (RGB hex-code)
+*/
 void setCircleLED(int noLED, uint32_t color)
 {
 	ringKlein.setPixelColor(noLED, color);
 	ringKlein.show();
 }
 
+/*
+ Init WiFi system
+*/
 void initWiFi()
 {
+	// set WiFi status indication
 	setCircleLED(4, RED);
 	WiFi.mode(WIFI_STA);
 	WiFi.begin(ssid, password);
 	Serial.print("Connecting to WiFi ..");
+
+	// wait for succesful connection to WiFi
 	while (WiFi.status() != WL_CONNECTED)
 	{
 		Serial.print('.');
@@ -256,11 +228,15 @@ void initWiFi()
 
 		delay(1000);
 	}
+	// set WiFi status indication
 	setCircleLED(4, GREEN);
 	Serial.println(WiFi.localIP());
 	drawIPAdr(WiFi.localIP());
 }
 
+/*
+Init SPIFFS file system
+*/
 void initSPIFFS()
 {
 	if (!SPIFFS.begin(true))
@@ -273,23 +249,86 @@ void initSPIFFS()
 	}
 }
 
+/*
+Sets output indicator LEDs colors
+
+@param output
+	1: left indicator LEDs - blue
+	2: left indicator LEDs - red
+	3: right indicator LEDs - blue
+	4: right indicator LEDs - red
+@param state
+	0: LED color OFF
+	0: LED color ON
+*/
 void setOutput(int output, int state)
 {
-	int ledNr;
+	static int ind1Color = 0; // color code for left indicator LEDs
+	static int ind2Color = 0; // color code for right indicator LEDs
 
-	ledNr = output + 4;
-	if (ledNr > 7)
+	switch (output)
 	{
-		ledNr = 0;
+	case 1: // left indicator blue LED
+		if (1 == state)
+		{
+			ind1Color = ind1Color | 0x0000FF;
+		}
+		else
+		{
+			ind1Color = ind1Color & 0xFFFF00;
+		}
+		break;
+	case 2: // left indicator red LED
+		if (1 == state)
+		{
+			ind1Color = ind1Color | 0xFF0000;
+		}
+		else
+		{
+			ind1Color = ind1Color & 0x00FFFF;
+		}
+		break;
+	case 3: // right indicator blue LED
+		if (1 == state)
+		{
+			ind2Color = ind2Color | 0x0000FF;
+		}
+		else
+		{
+			ind2Color = ind2Color & 0xFFFF00;
+		}
+		break;
+	case 4: // right indicator red LED
+		if (1 == state)
+		{
+			ind2Color = ind2Color | 0xFF0000;
+		}
+		else
+		{
+			ind2Color = ind2Color & 0x00FFFF;
+		}
+		break;
+
+	default:
+		break;
 	}
+
+	// store output states
 	if (state)
 	{
 		outputStates[output - 1] = true;
-		setCircleLED(ledNr, BLUE);
 	}
 	else
 	{
 		outputStates[output - 1] = false;
-		setCircleLED(ledNr, BLACK);
 	}
+
+	// set left indicator LEDS
+	setCircleLED(1, ind1Color);
+	setCircleLED(2, ind1Color);
+	setCircleLED(3, ind1Color);
+	// set right indicator LEDS
+	setCircleLED(5, ind2Color);
+	setCircleLED(6, ind2Color);
+	setCircleLED(7, ind2Color);
 }
