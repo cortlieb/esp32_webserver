@@ -1,39 +1,38 @@
-window.addEventListener('load', getStates);
 
-function toggleCheckbox(element) {
-	var xhr = new XMLHttpRequest(); //TODO: Deklaration austauschen mit let
-	if (element.checked) {
-		xhr.open("GET", "/update?output=" + element.id + "&state=1", true);
-		document.getElementById(element.id + "_state").innerHTML = "ON";
-	}
-	else {
-		xhr.open("GET", "/update?output=" + element.id + "&state=0", true);
-		document.getElementById(element.id + "_state").innerHTML = "OFF";
-	}
-	xhr.send();
+var gateway = `ws://${window.location.hostname}/ws`;
+var websocket;
+
+window.addEventListener('load', onload);
+function onload(event) {
+	console.log('DEBUG: onload-Event');
+	initWebSocket();
+	initButton();
 }
-
-function getStates() {
-	var xhr = new XMLHttpRequest(); //TODO: Deklaration austauschen mit let
-	xhr.onreadystatechange = function () {
-		if (this.readyState == 4 && this.status == 200) {
-			var stateObj = JSON.parse(this.responseText);
-			console.log(stateObj);
-			for (i in stateObj.outputs) {
-				var output = stateObj.outputs[i].output;
-				var state = stateObj.outputs[i].state;
-				console.log(output);
-				console.log(state);
-				if (state == "1") {
-					document.getElementById(output).checked = true;
-					document.getElementById(output + "_state").innerHTML = "ON";
-				} else {
-					document.getElementById(output).checked = false;
-					document.getElementById(output + "_state").innerHTML = "OFF";
-				}
-			}
-		}
-	}
-	xhr.open("GET", "/states", true);
-	xhr.send();
+function initWebSocket() {
+	console.log('Trying to open a WebSocket connection…');
+	websocket = new WebSocket(gateway);
+	websocket.onopen = onOpen;
+	websocket.onclose = onClose;
+	websocket.onmessage = onMessage;
+}
+function onOpen(event) {
+	console.log('Connection opened');
+}
+function onClose(event) {
+	console.log('Connection closed');
+	setTimeout(initWebSocket, 2000);
+}
+function onMessage(event) {
+	document.getElementById('state').innerHTML = event.data;
+	console.log(event.data);
+}
+function initButton() {
+	document.getElementById('bON').addEventListener('click', toggleON);
+	document.getElementById('bOFF').addEventListener('click', toggleOFF);
+}
+function toggleON(event) {
+	websocket.send('bON');
+}
+function toggleOFF(event) {
+	websocket.send('bOFF');
 }

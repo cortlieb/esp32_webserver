@@ -45,43 +45,28 @@ h1 {
   color: #1282a2;
 }
 
-.switch {
-  position: relative;
+Button {
+  border: none;
+  color: #fefcfb;
+  padding: 15px 32px;
+  text-align: center;
   display: inline-block;
-  width: 120px;
-  height: 68px;
+  font-size: 16px;
+  width: 100px;
+  border-radius: 4px;
+  transition-duration: 0.4s;
 }
 
-switch input {
-  display: none;
+.button-on {
+  background-color: #034078;
+}
+.button-off {
+  background-color: #858585;
 }
 
-.slider {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: #ccc;
-  border-radius: 50px;
+.button-on:hover {
+  background-color: #1282a2;
 }
-
-.slider::before {
-  position: absolute;
-  content: "";
-  height: 52px;
-  width: 52px;
-  left: 8px;
-  bottom: 8px;
-  background-color: #fff;
-  transition: 0.4s;
-  border-radius: 50px;
-}
-
-input:checked + .slider {
-  background-color: #b30000;
-}
-
-input:checked + .slider:before {
-  transform: translateX(52px);
+.button-off:hover {
+  background-color: #252524;
 }

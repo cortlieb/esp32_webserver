@@ -22,7 +22,6 @@
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <SPIFFS.h>
-#include <Arduino_JSON.h>
 
 // WIFI network credentials
 const char *ssid = "Villanetz";
@@ -31,12 +30,11 @@ const char *password = "Kellerbad100%";
 // Create AsyncWebServer object on port 80
 AsyncWebServer server(80);
 
-const char *PARAM_INPUT_OUTPUT = "output";
-const char *PARAM_INPUT_STATE = "state";
+// Create a WebSocket object
+AsyncWebSocket ws("/ws");
 
-#define NUM_OUTPUTS 4
-
-bool outputStates[NUM_OUTPUTS] = {false, false, false, false};
+// Stores LED state
+String ledState;
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -62,24 +60,84 @@ void drawCycleText(const char *test_char);
 void drawChar(const char character);
 void drawIPAdr(IPAddress ipAdr);
 void runningCircleSingle(uint32_t color, uint32_t backgroundColor, int wait);
-void setOutput(int output, int state);
+String processor(const String &var);
+
+void notifyClients(String state)
+{
+	ws.textAll(state);
+}
+
+void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
+{
+	AwsFrameInfo *info = (AwsFrameInfo *)arg;
+	if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT)
+	{
+		data[len] = 0;
+		if (strcmp((char *)data, "bON") == 0)
+		{
+			ledState = "ON";
+			notifyClients("ON");
+		}
+		if (strcmp((char *)data, "bOFF") == 0)
+		{
+			ledState = "OFF";
+			notifyClients("OFF");
+		}
+	}
+}
+
+void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type,
+			 void *arg, uint8_t *data, size_t len)
+{
+	switch (type)
+	{
+	case WS_EVT_CONNECT:
+		Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
+		break;
+	case WS_EVT_DISCONNECT:
+		Serial.printf("WebSocket client #%u disconnected\n", client->id());
+		break;
+	case WS_EVT_DATA:
+		handleWebSocketMessage(arg, data, len);
+		break;
+	case WS_EVT_PONG:
+	case WS_EVT_ERROR:
+		break;
+	}
+}
+
+void initWebSocket()
+{
+	ws.onEvent(onEvent);
+	server.addHandler(&ws);
+}
 
 /*
- Retrieves the stae of the used outputs.
+ Set one LED in the LED ring to the given color
 
- @return json-formatted status of outputs
+ @param noLED ID of LED (0 ... 7)
+ @param color LED color (RGB hex-code)
 */
-String getOutputStates()
+void setCircleLED(int noLED, uint32_t color)
 {
-	JSONVar outputStatesJSON;
-	for (int i = 0; i < NUM_OUTPUTS; i++)
+	ringKlein.setPixelColor(noLED, color);
+	ringKlein.show();
+}
+
+void indicatorLight(bool state)
+{
+	if (state)
 	{
-		outputStatesJSON["outputs"][i]["output"] = String(i + 1);
-		outputStatesJSON["outputs"][i]["state"] = (outputStates[i]) ? "1" : "0";
-		Serial.print(outputStates[i]);
+		setCircleLED(1, BLUE);
+		setCircleLED(2, BLUE);
+		setCircleLED(3, BLUE);
 	}
-	String jsonString = JSON.stringify(outputStatesJSON);
-	return jsonString;
+	else
+	{
+		setCircleLED(1, BLACK);
+		setCircleLED(2, BLACK);
+		setCircleLED(3, BLACK);
+	}
 }
 
 void setup()
@@ -103,42 +161,15 @@ void setup()
 	ringKlein.setBrightness(8);
 
 	initWiFi();
+	initWebSocket();
 	initSPIFFS();
 
 	// when server is requested on root adress the main html file is delivered
+	// TODO: Kommentar überprüfen und anpassen
 	server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
-			  { request->send(SPIFFS, "/index.html", "text/html"); });
+			  { request->send(SPIFFS, "/index.html", "text/html", false, processor); });
 	// serve requested files from root adress from file system root
 	server.serveStatic("/", SPIFFS, "/");
-
-	// when server is requested on "/states" adress json-formatted states of outputs are delivered
-	server.on("/states", HTTP_GET, [](AsyncWebServerRequest *request)
-			  {
-		String json = getOutputStates();
-		request->send(200, "application/json", json);
-		json = String(); });
-
-	// when server is requested on "/update" outputs are set according to request parameters
-	server.on("/update", HTTP_GET, [](AsyncWebServerRequest *request)
-			  {
-		String output;
-		String state;
-
-		//if request has correct format
-		if (request->hasParam(PARAM_INPUT_OUTPUT) && request->hasParam(PARAM_INPUT_STATE)) {
-			output = request->getParam(PARAM_INPUT_OUTPUT)->value();
-			state = request->getParam(PARAM_INPUT_STATE)->value();
-			//set outputs according to transmitted parameters
-			setOutput(output.toInt(), state.toInt());
-		} else {
-			output = "No message sent";
-			state = "No message sent";
-		} 
-		Serial.print("GPIO: ");
-		Serial.print(output);
-		Serial.print(" - Set to: ");
-		Serial.println(state);
-		request->send(200, "text/plain", "OK"); });
 
 	// Start server
 	server.begin();
@@ -146,7 +177,16 @@ void setup()
 
 void loop()
 {
-	;
+	ws.cleanupClients();
+	// TODO: warum darf Operanden Reihenfolge hier nicht vertauscht werden?
+	if (ledState == "ON")
+	{
+		indicatorLight(true);
+	}
+	else
+	{
+		indicatorLight(false);
+	}
 }
 
 void drawCycleText(const char *text)
@@ -198,18 +238,6 @@ void runningCircleSingle(uint32_t color, uint32_t backgroundColor, int wait)
 }
 
 /*
- Set one LED in the LED ring to the given color
-
- @param noLED ID of LED (0 ... 7)
- @param color LED color (RGB hex-code)
-*/
-void setCircleLED(int noLED, uint32_t color)
-{
-	ringKlein.setPixelColor(noLED, color);
-	ringKlein.show();
-}
-
-/*
  Init WiFi system
 */
 void initWiFi()
@@ -249,86 +277,11 @@ void initSPIFFS()
 	}
 }
 
-/*
-Sets output indicator LEDs colors
-
-@param output
-	1: left indicator LEDs - blue
-	2: left indicator LEDs - red
-	3: right indicator LEDs - blue
-	4: right indicator LEDs - red
-@param state
-	0: LED color OFF
-	0: LED color ON
-*/
-void setOutput(int output, int state)
+String processor(const String &var)
 {
-	static int ind1Color = 0; // color code for left indicator LEDs
-	static int ind2Color = 0; // color code for right indicator LEDs
-
-	switch (output)
+	if (var == "STATE")
 	{
-	case 1: // left indicator blue LED
-		if (1 == state)
-		{
-			ind1Color = ind1Color | 0x0000FF;
-		}
-		else
-		{
-			ind1Color = ind1Color & 0xFFFF00;
-		}
-		break;
-	case 2: // left indicator red LED
-		if (1 == state)
-		{
-			ind1Color = ind1Color | 0xFF0000;
-		}
-		else
-		{
-			ind1Color = ind1Color & 0x00FFFF;
-		}
-		break;
-	case 3: // right indicator blue LED
-		if (1 == state)
-		{
-			ind2Color = ind2Color | 0x0000FF;
-		}
-		else
-		{
-			ind2Color = ind2Color & 0xFFFF00;
-		}
-		break;
-	case 4: // right indicator red LED
-		if (1 == state)
-		{
-			ind2Color = ind2Color | 0xFF0000;
-		}
-		else
-		{
-			ind2Color = ind2Color & 0x00FFFF;
-		}
-		break;
-
-	default:
-		break;
+		return ledState;
 	}
-
-	// store output states
-	if (state)
-	{
-		outputStates[output - 1] = true;
-	}
-	else
-	{
-		outputStates[output - 1] = false;
-	}
-
-	// set left indicator LEDS
-	setCircleLED(1, ind1Color);
-	setCircleLED(2, ind1Color);
-	setCircleLED(3, ind1Color);
-	// set right indicator LEDS
-	setCircleLED(5, ind2Color);
-	setCircleLED(6, ind2Color);
-	setCircleLED(7, ind2Color);
+	return String();
 }
