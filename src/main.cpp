@@ -1,3 +1,4 @@
+// TODO: KOmmentare an aktuelle Funktion anpassen. Auch im js und evrl css filegit
 /**************************************************************************
  * ESP32 Webserver example
  * Using:
@@ -14,7 +15,7 @@
 // #include <Arduino.h> //lt. Webserver Ebook nötig, war aber vorher nicht da und lief bis dahin trotzdem - beobachten!
 #include "../include/colors.h"
 #include <SPI.h>
-#include <Adafruit_NeoPixel.h>
+#include <FastLED.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
@@ -39,8 +40,10 @@ String ledState;
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
-#define LED_RING_KL_PIN 2
-#define LED_RING_KL_COUNT 8
+#define LED_STRIPE_DATA_PIN 2
+#define LED_STRIPE_CLOCK_PIN 4
+#define LED_STRIPE_COUNT 60
+#define BRIGHTNESS 255
 
 #define DELAY 100
 
@@ -51,15 +54,14 @@ String ledState;
 							// in fac 0x3C works
 // create object for the display
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
-// create object for the LED-ring
-Adafruit_NeoPixel ringKlein(LED_RING_KL_COUNT, LED_RING_KL_PIN, NEO_GRB + NEO_KHZ800);
+
+CRGB leds[LED_STRIPE_COUNT];
 
 void initWiFi();
 void initSPIFFS();
 void drawCycleText(const char *test_char);
 void drawChar(const char character);
 void drawIPAdr(IPAddress ipAdr);
-void runningCircleSingle(uint32_t color, uint32_t backgroundColor, int wait);
 String processor(const String &var);
 
 void notifyClients(String state)
@@ -118,26 +120,10 @@ void initWebSocket()
  @param noLED ID of LED (0 ... 7)
  @param color LED color (RGB hex-code)
 */
-void setCircleLED(int noLED, uint32_t color)
-{
-	ringKlein.setPixelColor(noLED, color);
-	ringKlein.show();
-}
 
 void indicatorLight(bool state)
 {
-	if (state)
-	{
-		setCircleLED(1, BLUE);
-		setCircleLED(2, BLUE);
-		setCircleLED(3, BLUE);
-	}
-	else
-	{
-		setCircleLED(1, BLACK);
-		setCircleLED(2, BLACK);
-		setCircleLED(3, BLACK);
-	}
+	;
 }
 
 void setup()
@@ -156,9 +142,8 @@ void setup()
 	display.clearDisplay();
 	display.display();
 
-	ringKlein.begin();
-	ringKlein.show();
-	ringKlein.setBrightness(8);
+	LEDS.addLeds<APA102, LED_STRIPE_DATA_PIN, LED_STRIPE_CLOCK_PIN, RGB>(leds, LED_STRIPE_COUNT);
+	FastLED.setBrightness(BRIGHTNESS);
 
 	initWiFi();
 	initWebSocket();
@@ -177,16 +162,24 @@ void setup()
 
 void loop()
 {
-	ws.cleanupClients();
-	// TODO: warum darf Operanden Reihenfolge hier nicht vertauscht werden?
-	if (ledState == "ON")
-	{
-		indicatorLight(true);
-	}
-	else
-	{
-		indicatorLight(false);
-	}
+	// ws.cleanupClients();
+	// // TODO: warum darf Operanden Reihenfolge hier nicht vertauscht werden?
+	// if (ledState == "ON")
+	// {
+	// 	indicatorLight(true);
+	// }
+	// else
+	// {
+	// 	indicatorLight(false);
+	// }
+	leds[0] = CRGB(255, 0, 0);
+	leds[1] = CRGB(0, 255, 0);
+	leds[2] = CRGB(0, 255, 0);
+	leds[3] = CRGB(0, 0, 255);
+	leds[4] = CRGB(0, 0, 255);
+	leds[5] = CRGB(0, 0, 255);
+	FastLED.show();
+	delay(1000);
 }
 
 void drawCycleText(const char *text)
@@ -226,24 +219,12 @@ void drawIPAdr(IPAddress ipAdr)
 	display.display();
 }
 
-void runningCircleSingle(uint32_t color, uint32_t backgroundColor, int wait)
-{
-	for (int i = 0; i < LED_RING_KL_COUNT; i++)
-	{
-		ringKlein.fill(backgroundColor);
-		ringKlein.setPixelColor(i, color);
-		ringKlein.show();
-		delay(wait);
-	}
-}
-
 /*
  Init WiFi system
 */
 void initWiFi()
 {
 	// set WiFi status indication
-	setCircleLED(4, RED);
 	WiFi.mode(WIFI_STA);
 	WiFi.begin(ssid, password);
 	Serial.print("Connecting to WiFi ..");
@@ -257,7 +238,6 @@ void initWiFi()
 		delay(1000);
 	}
 	// set WiFi status indication
-	setCircleLED(4, GREEN);
 	Serial.println(WiFi.localIP());
 	drawIPAdr(WiFi.localIP());
 }
